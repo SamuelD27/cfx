@@ -115,6 +115,10 @@ RUN test -d /app/LoRACaptioner && echo "OK: LoRACaptioner submodule present" || 
 # Create directories for runtime data
 RUN mkdir -p /app/scratch /app/ComfyUI/models/checkpoints /app/ComfyUI/models/loras
 
+# Install backend dependencies
+RUN cd /app/charforge-gui/backend && \
+    uv pip install --system --no-cache-dir -r requirements.txt
+
 # Install frontend dependencies
 RUN cd /app/charforge-gui/frontend && npm install
 
