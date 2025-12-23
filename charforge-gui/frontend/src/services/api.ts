@@ -18,11 +18,24 @@ api.interceptors.request.use((config) => {
 // Response interceptor for error handling
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem('auth_token')
-      window.location.href = '/login'
+      // Check if auth is enabled before redirecting
+      try {
+        const configResponse = await fetch('/api/auth/config')
+        if (configResponse.ok) {
+          const config = await configResponse.json()
+          if (config.auth_enabled) {
+            // Only redirect to login if auth is actually enabled
+            localStorage.removeItem('auth_token')
+            window.location.href = '/login'
+          }
+          // If auth is disabled, don't redirect - just let the error propagate
+        }
+      } catch {
+        // If we can't check auth config, don't redirect
+        console.warn('Could not check auth config, not redirecting on 401')
+      }
     }
     return Promise.reject(error)
   }

@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 
 from app.core.database import get_db, Character, InferenceJob, User
-from app.core.auth import get_current_active_user, get_current_user_optional
+from app.core.auth import get_current_user_optional
 from app.services.charforge_integration import CharForgeIntegration, InferenceConfig
 from app.services.settings_service import get_user_env_vars
 
@@ -61,7 +61,7 @@ async def generate_images(
     request: InferenceRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_user_optional)
 ):
     """Generate images using a trained character LoRA."""
     

@@ -1,175 +1,267 @@
-# AI-Powered Character LoRA Creation
+# CharForgex: Identity LoRA Training Pipeline
 
-l
+CharForgex is an automated pipeline for training character-specific FLUX.1-dev LoRA models from a single reference image. Given one high-quality photo, it generates a multi-view character sheet, auto-captions the images, and trains a LoRA optimized for identity preservation. The goal is photorealistic outputs where the generated person is indistinguishable from the reference.
 
-### Prerequisites
-*   Python 3.10 or higher
-*   GPU with at least 48GB VRAM
-*   At least 60GB RAM
-*   At least 100GB of free disk space
+---
 
-### Setup
+## Hardware Requirements
 
-1.
-    cd CharForge
-    ```
+| Resource | Minimum | Recommended | What Breaks If Under |
+|----------|---------|-------------|----------------------|
+| GPU VRAM | 48GB | 48GB+ | OOM during multiview generation or training; pipeline halts |
+| System RAM | 60GB | 64GB+ | ComfyUI workflows crash; Python killed by OOM |
+| Disk Space | 100GB | 150GB+ | Model downloads fail; cache fills up |
+| GPU | NVIDIA A6000/L40S/A100 | L40S or better | Unsupported; AMD/Intel not tested |
 
-2.  Set these API keys and variables in your `.env` and add funds where appropriate:
-    ```bash
-    HF_TOKEN
-    HF_HOME
-    CIVITAI_API_KEY
-    GOOGLE_API_KEY
-    FAL_KEY
-    ```
+**Critical**: This pipeline is designed for high-end NVIDIA GPUs. Consumer GPUs (RTX 3090, 4090) may work for inference but will likely OOM during training. FaceEnhance requires >48GB VRAM.
 
-3.  Log into Hugging Face and accept their terms of service to download [Flux.1-dev](https://huggingface.co/black-forest-labs/FLUX.1-dev)
+---
 
-4.  Run the setup script:
-    ```bash
-    bash setup.sh
-    ```
+## External API Dependencies
 
-    This will:
-    - 
-        <summary>Show all ComfyUI custom nodes</summary>
+This pipeline requires multiple external APIs. **All are billed/metered** - ensure you have credits.
 
-        - comfyui_essentials
-        - comfyui-advancedliveportrait
-        - comfyui-ic-light
-        - comfyui-impact-pack
-        - comfyui-custom-scripts
-        - rgthree-comfy
-        - comfyui-easy-use
-        - comfyui-impact-subpack
-        - was-node-suite-comfyui
-        - ComfyUI_UltimateSDUpscale
-        - ComfyUI-PuLID-Flux-Enhanced
-        - comfy-image-saver
-        - ComfyUI-Image-Filters
-        - ComfyUI-Detail-Daemon
-        - ComfyUI-KJNodes
-        </details>
-    - Download all necessary models to `HF_HOME`
-    - Set up the character sheet generation pipeline
+| API | Required | Used For | Failure Mode |
+|-----|----------|----------|--------------|
+| **HuggingFace** | Yes | FLUX.1-dev model download | Blocks setup; training impossible |
+| **Google Gemini** | Yes | Image captioning, prompt optimization | Captions fail; identity drift in trained LoRA |
+| **fal.ai** | Yes | ESRGAN upscaling, PuLID-Flux images | Sheet generation fails; lower quality outputs |
+| **CivitAI** | Yes (setup) | Checkpoint model downloads | Setup fails; manual download required |
 
-5.  Activate venv:
-    `source .venv/bin/activate`
+### Required Environment Variables
 
-## Usage
-
-### 1. Train a Character LoRA
+Create `.env` in repo root:
 
 ```bash
-python train_character.py --name "character_name" --input "path/to/reference_image.png"
+# HuggingFace - REQUIRED
+HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+HF_HOME=/path/to/huggingface/cache   # Where models are stored (100GB+)
+
+# Google Gemini - REQUIRED
+GOOGLE_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# fal.ai - REQUIRED
+FAL_KEY=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+
+# CivitAI - REQUIRED for setup
+CIVITAI_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-<details>
-<summary>Show all training options</summary>
+See [docs/ENV_SETUP.md](docs/ENV_SETUP.md) for detailed setup and validation.
+
+---
+
+## Quickstart
+
+### Setup (One-time)
+
+```bash
+# 1. Clone with submodules
+git clone --recursive https://github.com/your-repo/CharForgex.git
+cd CharForgex
+
+# 2. Create .env with your API keys (see above)
+cp .env.example .env
+# Edit .env with real values
+
+# 3. Accept FLUX.1-dev license at HuggingFace
+# https://huggingface.co/black-forest-labs/FLUX.1-dev
+
+# 4. Run setup (downloads ~50GB of models)
+bash setup.sh
+
+# 5. Activate environment
+source .venv/bin/activate
+```
+
+### Training (30-40 min on L40S)
 
 ```bash
 python train_character.py \
-  --name "character_name" \
-  --input "path/to/reference_image.png" \
-  [--work_dir WORK_DIR] \
-  [--steps STEPS] \
-  [--batch_size BATCH_SIZE] \
-  [--lr LEARNING_RATE] \
-  [--train_dim TRAIN_DIM] \
-  [--rank_dim RANK_DIM] \
-  [--pulidflux_images PULID_FLUX_IMAGES]
+  --name "person_name" \
+  --input "/path/to/reference.jpg"
 ```
 
-- `--name` (str): Character name (used for folder and model naming)
-- `--input` (str): Path to input image
-- `--work_dir` (str, optional): Working directory (defaults to `./scratch/{name}/`)
-- `--steps` (int, optional): Number of training steps (default: 800)
-- `--batch_size` (int, optional): Training batch size (default: 1)
-- `--lr` (float, optional): Learning rate (default: 8e-4)
-- `--train_dim` (int, optional): Training image dimension (default: 512)
-- `--rank_dim` (int, optional): LoRA rank dimension (default: 8)
-- `--pulidflux_images` (int, optional): Number of Pulid-Flux images to include (default: 0)
+Output: `./scratch/person_name/char/char.safetensors`
 
-</details>
-
-This command will:
-1.  Generate a character sheet from your input image
-2.  Caption the generated images
-3.  Train a [LoRA](https://arxiv.org/abs/2106.09685) on [Flux.1-dev](https://huggingface.co/black-forest-labs/FLUX.1-dev) using the generated dataset
-
-### 2. Generate Images with Your Character LoRA
-
-```bash
-python test_character.py --character_name "character_name" --prompt "A detailed prompt here"
-```
-
-<details>
-<summary>Show all inference options</summary>
+### Inference
 
 ```bash
 python test_character.py \
-  --character_name "character_name" \
-  --prompt "A detailed prompt here" \
-  [--work_dir WORK_DIR] \
-  [--lora_weight LORA_WEIGHT] \
-  [--test_dim TEST_DIM] \
-  [--do_optimize_prompt/--no_optimize_prompt] \
-  [--output_filenames FILE1 FILE2 ...] \
-  [--batch_size BATCH_SIZE] \
-  [--num_inference_steps STEPS] \
-  [--fix_outfit/--no_fix_outfit] \
-  [--safety_check/--no_safety_check] \
-  [--face_enhance/--no_face_enhance]
+  --character_name "person_name" \
+  --prompt "A professional headshot in a modern office"
 ```
 
-- `--character_name` (str): Name of the character (used to find LoRA and work_dir)
-- `--prompt` (str): The prompt to use for generation
-- `--work_dir` (str, optional): Working directory (defaults to `./scratch/{character_name}/`)
-- `--lora_weight` (float, optional): LoRA strength (default: 0.73)
-- `--test_dim` (int, optional): Image width/height (default: 1024)
-- `--do_optimize_prompt` / `--no_optimize_prompt`: Whether to optimize the prompt using LoRACaptioner (default: enabled)
-- `--output_filenames` (str, optional): Filenames for output images (space separated list)
-- `--batch_size` (int, optional): Number of images to generate (default: 4)
-- `--num_inference_steps` (int, optional): Steps for generation (default: 30)
-- `--fix_outfit` / `--no_fix_outfit`: Use the reference image flag in prompt optimization (default: disabled)
-- `--safety_check` / `--no_safety_check`: Run safety checks on generated images (default: enabled)
-- `--face_enhance` / `--no_face_enhance`: Enable or disable face enhancement (default: disabled)
+Output: `./scratch/person_name/output/*.jpg`
 
-</details>
+See [docs/OPERATOR_GUIDE.md](docs/OPERATOR_GUIDE.md) for the complete workflow.
 
-This command will:
-1.  Load your LoRA, prompt it, and generate the image(s)
-2.  Optionally do prompt optimization, [FaceEnhance](https://github.com/RishiDesai/FaceEnhance) outputs, and run a safety check.
+---
 
-Note: The first run of `train_character.py` and `test_character.py` will take longer as remaining models will be downloaded.
+## Fidelity-First Operating Principles
 
-## Implementation Details
+The #1 goal is **identity fidelity**: generated images should be indistinguishable from photos of the real person.
 
-- The training script runs a [ComfyUI](https://github.com/comfyanonymous/ComfyUI) server ephemerally.
-- All character images and character data are saved in `./scratch/{character_name}` for easy access and organization.
-- [fal.ai](https://fal.ai/) is used for upscaling and generating [PuLID-Flux](https://github.com/ToTheBeginning/PuLID) images. 
-- **Google GenAI** (`gemini-2.5-flash`) is used for image captioning and prompt optimization (via [LoRACaptioner](https://github.com/RishiDesai/LoRACaptioner.git)) and for generating prompts for PuLID-Flux.
-- The character sheet generation is partly based off [Mickmumpitz's](https://x.com/mickmumpitz) Flux character consistency workflow. Specifically upscaling images, facial expressions, and lighting conditions. 
-- Sections of the workflow were broken up into modular pieces. I used the [ComfyUI-to-Python-Extension](https://github.com/pydn/ComfyUI-to-Python-Extension) to re-engineer components for efficiency and function.
+### Reference Image Selection
 
-#### Training and Inference
+Your reference image is the foundation. Bad input = bad LoRA.
 
-- The character sheet includes multi-view images, varied facial expressions, lighting conditions, and (optionally) PuLID-Flux images. 
-- Images are autocaptioned using [LoRACaptioner](https://github.com/RishiDesai/LoRACaptioner).
-- LoRA is trained using [ai-toolkit](https://github.com/ostris/ai-toolkit).
-- Inference is handled by [diffusers](https://huggingface.co/docs/diffusers/en/index) with some speed improvements from the [Modal Flux inference guide](https://modal.com/docs/examples/flux).
+| Criterion | Optimal | Acceptable | Avoid |
+|-----------|---------|------------|-------|
+| Lighting | Even, diffused, natural | Slightly directional | Harsh shadows, backlit, mixed color temps |
+| Angle | Frontal, slight 3/4 | Clear profile | Extreme angles, looking away |
+| Expression | Neutral, slight smile | Natural expression | Extreme expressions, eyes closed |
+| Resolution | 1024px+ per side | 512px+ | Under 512px |
+| Cropping | Head + shoulders visible | Face clearly visible | Cropped face, distant full-body |
+| Occlusions | None | Minimal jewelry | Sunglasses, hats, masks, hands on face |
+| Background | Clean, simple | Non-distracting | Busy, patterned, other faces |
 
-#### Hyperparameters
-- Training: LoRA rank of 8 and resolution fixed to 512x512 is the right balance of quality and speed.
-   - Entire training pipeline takes 30-40 minutes on 1 L40S
-- Inference: Resolution of 1024x1024 and LoRA weight of 0.65-0.85 gives the best results.
-   - Batch size of 4 takes 60 seconds on 1 L40S if the models are loaded in memory, 120 seconds otherwise.
-   - If FaceEnhance is enabled, you will likely need more than 48GB VRAM.
+### How the Pipeline Expands Data
 
-#### Advanced Usage
+From your single image, the pipeline generates:
 
-- **Training Parameters**: You can modify training parameters by passing the relevant CLI arguments to `train_character.py`, or by editing the YAML config [`scripts/character_lora.yaml`](scripts/character_lora.yaml).
-- **Public LoRA Serving**: Use [`python scripts/serve_lora.py`](scripts/serve_lora.py) to serve LoRA weights via a FastAPI server, making them publicly accessible (e.g., for fal.ai inference).
-- **Run ComfyUI Server**: Use [`python scripts/run_comfy.py`](scripts/run_comfy.py) to launch a ComfyUI server, useful for doing inference manually.
-- **Symlink LoRAs for ComfyUI**: Use [`bash scripts/symlink_loras.sh`](scripts/symlink_loras.sh) to symlink trained LoRA weights from `scratch/{character_name}/` to the ComfyUI LoRA directory for easy access.
-# CharForget
+| Stage | Images | Purpose | Fidelity Contribution |
+|-------|--------|---------|----------------------|
+| Multi-view | 6 | Front, sides, back views | **High** - teaches 3D face structure |
+| Lighting | 4 | Overcast, sunset, nightclub, desert | **Medium** - prevents lighting overfitting |
+| Emotions | 2 | Smiling, surprised | **Medium** - teaches expression range |
+| PuLID-Flux | 0-N | Synthetic variations | **Variable** - can help or hurt |
+
+**Warning**: PuLID-Flux images (`--pulidflux_images N`) can introduce identity drift if N is too high. Start with 0 or 3-5 max.
+
+### Captioning and Identity
+
+The auto-captioner (Google Gemini) creates `.txt` files describing each image. These captions directly affect what the LoRA learns.
+
+**Key**: Captions should NOT include the person's name or identifying info. The LoRA learns the visual pattern, not the words. Adding names causes the model to associate random text patterns with the face.
+
+### Inference for Maximum Fidelity
+
+| Parameter | Value | Reasoning |
+|-----------|-------|-----------|
+| `--lora_weight` | 0.65-0.85 | Below 0.6 loses identity; above 0.9 loses flexibility |
+| `--test_dim` | 1024 | Native resolution; higher adds no benefit |
+| `--do_optimize_prompt` | enabled (default) | Uses LoRACaptioner to enhance prompt |
+| `--num_inference_steps` | 28-35 | Lower = faster but may lose detail |
+
+See [docs/FIDELITY_PLAYBOOK.md](docs/FIDELITY_PLAYBOOK.md) for deep guidance.
+
+---
+
+## Troubleshooting Matrix
+
+| Symptom | Likely Cause | Fastest Fix |
+|---------|--------------|-------------|
+| `CUDA out of memory` during training | VRAM < 48GB or other GPU processes | Kill other GPU tasks; reduce batch_size to 1 |
+| `CUDA out of memory` during inference | FaceEnhance enabled with insufficient VRAM | Use `--no_face_enhance` |
+| Training completes but LoRA not found | Wrong `work_dir` or training failed silently | Check `./scratch/{name}/char/char.safetensors` exists |
+| Captioner fails with 401/403 | Invalid or expired `GOOGLE_API_KEY` | Regenerate key at Google AI Studio |
+| fal.ai timeout/500 errors | fal.ai service issues or rate limit | Retry in 5 min; check fal.ai status page |
+| Setup fails downloading models | `CIVITAI_API_KEY` invalid | Get new key from civitai.com/user/account |
+| `ComfyUI workflow error` | Missing custom nodes or models | Re-run `bash setup.sh` |
+| Safety check blocks all outputs | Model generating NSFW unintentionally | Check prompt for implicit triggers; use `--no_safety_check` to debug |
+| Identity drift in outputs | LoRA weight too low or prompt conflicts | Increase `--lora_weight` to 0.8+; simplify prompt |
+| Outputs look nothing like reference | Bad reference image or caption pollution | Review ref image against criteria; re-train |
+
+See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for expanded diagnostics.
+
+---
+
+## File/Folder Map
+
+```
+CharForgex/
+├── train_character.py      # Main training entrypoint
+├── test_character.py       # Main inference entrypoint
+├── setup.sh                # One-time setup script
+├── install.py              # Installation logic
+├── helpers.py              # Subprocess and LoRA utilities
+├── .env                    # Your API keys (create from .env.example)
+│
+├── scratch/                # All character outputs
+│   └── {character_name}/
+│       ├── sheet/          # Generated training images
+│       │   ├── original.png
+│       │   ├── input.png
+│       │   ├── upscaled_multiview_*.png
+│       │   ├── upscaled_lighting_*.png
+│       │   ├── upscaled_emotions_*.png
+│       │   ├── face_upscaled.png
+│       │   ├── *.txt       # Caption files
+│       │   └── image_info.json
+│       ├── char/           # Trained LoRA
+│       │   └── char.safetensors
+│       ├── output/         # Inference outputs
+│       ├── config.yaml     # Training config used
+│       └── timing.log      # Stage timing data
+│
+├── training/               # Training pipeline modules
+├── inference/              # Inference and safety modules
+├── scripts/                # Shell scripts and configs
+├── charforge-gui/          # Optional web GUI
+└── docs/                   # Documentation
+```
+
+---
+
+## Known Limitations
+
+- **Runtime**: Full training pipeline takes 30-45 minutes on L40S. Inference batch of 4 takes ~60s (models loaded) or ~120s (cold start).
+- **Determinism**: Outputs are stochastic. Same prompt + seed does not guarantee identical output across runs due to model loading variations.
+- **FaceEnhance**: Requires >48GB VRAM and adds ~30s per image. May alter skin texture.
+- **PuLID-Flux**: Synthetic images can drift from identity. Test with 0 first, add sparingly.
+- **Safety Checker**: May false-positive on non-NSFW content. Use `--no_safety_check` to debug, then re-enable.
+- **Consumer GPUs**: RTX 3090/4090 may work for inference only; training will OOM.
+
+---
+
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [docs/OPERATOR_GUIDE.md](docs/OPERATOR_GUIDE.md) | Step-by-step workflow from image to inference |
+| [docs/FIDELITY_PLAYBOOK.md](docs/FIDELITY_PLAYBOOK.md) | Deep guidance on maximizing identity accuracy |
+| [docs/ENV_SETUP.md](docs/ENV_SETUP.md) | Environment variables, API key setup, validation |
+| [docs/PIPELINE_OVERVIEW.md](docs/PIPELINE_OVERVIEW.md) | Architecture diagram and code flow |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Expanded error diagnosis and fixes |
+| [docs/GUI_LOCAL.md](docs/GUI_LOCAL.md) | Running the optional web GUI locally |
+| [docs/DOCKER.md](docs/DOCKER.md) | Docker container usage |
+
+---
+
+## Advanced Usage
+
+### Custom Training Parameters
+
+Edit `scripts/character_lora.yaml` or pass CLI flags:
+
+```bash
+python train_character.py \
+  --name "person" \
+  --input "ref.jpg" \
+  --steps 1200 \           # More training (default: 800)
+  --rank_dim 16 \          # Higher LoRA rank (default: 8)
+  --train_dim 768 \        # Higher res training images (default: 512)
+  --pulidflux_images 5     # Add synthetic images (default: 0)
+```
+
+### Serving LoRA Weights
+
+```bash
+python scripts/serve_lora.py --character_name "person"
+# Serves LoRA via FastAPI for remote inference
+```
+
+### Manual ComfyUI
+
+```bash
+python scripts/run_comfy.py
+# Launches ComfyUI server for manual workflow editing
+```
+
+### Symlink LoRAs to ComfyUI
+
+```bash
+bash scripts/symlink_loras.sh
+# Links all scratch/*/char/*.safetensors to ComfyUI/models/loras/
+```

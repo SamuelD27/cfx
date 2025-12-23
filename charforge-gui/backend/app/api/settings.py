@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Dict, Optional
 
 from app.core.database import get_db, User
-from app.core.auth import get_current_active_user, get_current_user_optional
+from app.core.auth import get_current_user_optional
 from app.services.settings_service import (
     save_user_setting,
     get_user_setting,
@@ -51,7 +51,7 @@ SENSITIVE_KEYS = {
 async def save_setting(
     request: SettingRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_user_optional)
 ):
     """Save a user setting."""
     
@@ -113,7 +113,7 @@ async def get_all_settings(
 async def delete_setting(
     key: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_user_optional)
 ):
     """Delete a user setting."""
     
@@ -131,7 +131,7 @@ async def delete_setting(
 async def save_environment_settings(
     request: EnvironmentSettingsRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_user_optional)
 ):
     """Save environment settings for CharForge."""
     

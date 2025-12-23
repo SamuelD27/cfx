@@ -97,11 +97,21 @@ router.beforeEach(async (to, from, next) => {
     await authStore.initializeAuth()
   }
 
-  // If auth is disabled, allow all routes
+  // Auth is disabled by default for local power user workflow
+  // Always allow access, redirect away from login/register pages
   if (!authStore.authEnabled) {
+    // Ensure default user is set even if initializeAuth didn't complete
+    if (!authStore.user) {
+      authStore.user = {
+        id: 1,
+        username: 'default_user',
+        email: 'default@charforge.local',
+        is_active: true
+      }
+    }
     // Skip login/register routes when auth is disabled
     if (to.path === '/login' || to.path === '/register') {
-      next('/')
+      next('/dashboard')
       return
     }
     next()

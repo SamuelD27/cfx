@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 from app.core.database import get_db, User
-from app.core.auth import get_current_active_user, get_current_user_optional
+from app.core.auth import get_current_user_optional
 from app.core.config import settings
 
 router = APIRouter()
@@ -35,7 +35,7 @@ class TrainerInfo(BaseModel):
 class TrainerListResponse(BaseModel):
     trainers: List[TrainerInfo]
 
-@router.get("/models", response_model=ModelListResponse)
+@router.get("", response_model=ModelListResponse)
 async def list_available_models(
     current_user: User = Depends(get_current_user_optional)
 ):

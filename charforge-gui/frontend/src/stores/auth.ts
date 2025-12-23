@@ -30,7 +30,7 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const token = ref<string | null>(null)
   const isLoading = ref(false)
-  const authEnabled = ref<boolean>(true) // Will be set based on backend config
+  const authEnabled = ref<boolean>(false) // Default to disabled for local power user workflow
 
   // Getters
   const isAuthenticated = computed(() => {
@@ -68,13 +68,26 @@ export const useAuthStore = defineStore('auth', () => {
           is_active: true
         }
       } else {
-        // Server error, assume auth is enabled for safety
-        authEnabled.value = true
+        // Server error - for local power user tool, default to auth disabled
+        console.warn('Auth config endpoint returned error, defaulting to auth disabled')
+        authEnabled.value = false
+        user.value = {
+          id: 1,
+          username: 'default_user',
+          email: 'default@charforge.local',
+          is_active: true
+        }
       }
     } catch (error) {
-      // Network error, assume auth is enabled for safety
-      console.warn('Failed to check auth config, assuming auth is enabled:', error)
-      authEnabled.value = true
+      // Network error - for local power user tool, default to auth disabled
+      console.warn('Failed to check auth config, defaulting to auth disabled:', error)
+      authEnabled.value = false
+      user.value = {
+        id: 1,
+        username: 'default_user',
+        email: 'default@charforge.local',
+        is_active: true
+      }
     }
   }
 
@@ -82,7 +95,15 @@ export const useAuthStore = defineStore('auth', () => {
     await checkAuthEnabled()
 
     if (!authEnabled.value) {
-      // Auth is disabled, no need to check tokens
+      // Auth is disabled, ensure default user is set
+      if (!user.value) {
+        user.value = {
+          id: 1,
+          username: 'default_user',
+          email: 'default@charforge.local',
+          is_active: true
+        }
+      }
       return
     }
 

@@ -35,8 +35,9 @@
                 v-model="form.datasetId"
                 class="w-full px-3 py-2 border border-input rounded-md"
                 @change="onDatasetChange"
+                :disabled="datasets.length === 0"
               >
-                <option value="">Select a dataset or use single image</option>
+                <option value="">{{ datasets.length === 0 ? 'No datasets available - use single image below' : 'Select a dataset or use single image' }}</option>
                 <option
                   v-for="dataset in datasets"
                   :key="dataset.id"
@@ -46,7 +47,8 @@
                 </option>
               </select>
               <p class="text-xs text-muted-foreground mt-1">
-                Choose a prepared dataset for better training results, or <router-link to="/datasets" class="text-primary hover:underline">create a new one</router-link>
+                <span v-if="datasets.length === 0">No datasets found. </span>
+                <router-link to="/datasets" class="text-primary hover:underline">Create a dataset</router-link> for better training results, or use a single reference image below.
               </p>
             </div>
 
@@ -99,10 +101,18 @@
                 <!-- Or Select from Media Library -->
                 <div class="text-center">
                   <p class="text-sm text-muted-foreground mb-3">Or select from your media library</p>
-                  <Button type="button" variant="outline" @click="showMediaLibrary = true">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    @click="openMediaLibrary"
+                    :disabled="isLoadingMedia"
+                  >
                     <Image class="mr-2 h-4 w-4" />
-                    Choose from Library
+                    {{ isLoadingMedia ? 'Loading...' : `Choose from Library (${mediaFiles.length} images)` }}
                   </Button>
+                  <p v-if="mediaFiles.length === 0 && !isLoadingMedia" class="text-xs text-muted-foreground mt-2">
+                    No images in library. <router-link to="/media" class="text-primary hover:underline">Upload images first</router-link>
+                  </p>
                 </div>
               </div>
             </div>
@@ -435,7 +445,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import { Upload, Image, X, Zap } from 'lucide-vue-next'
@@ -509,6 +519,7 @@ const showMediaLibrary = ref(false)
 const mediaFiles = ref<MediaFile[]>([])
 const datasets = ref<Dataset[]>([])
 const isCreating = ref(false)
+const isLoadingMedia = ref(false)
 const fileInput = ref<HTMLInputElement>()
 
 // Model and configuration data
@@ -525,18 +536,37 @@ const availableTrainers = ref([])
 const selectedTrainer = ref('lora')
 
 const canCreate = computed(() => {
-  return form.value.name.trim() && form.value.triggerWord.trim() &&
-         (selectedImage.value || form.value.datasetId) &&
-         validateTrainingParameters()
+  const hasName = form.value.name.trim().length > 0
+  const hasTriggerWord = form.value.triggerWord.trim().length > 0
+  const hasImageOrDataset = selectedImage.value || form.value.datasetId
+  const validParams = validateTrainingParameters()
+
+  // Debug logging
+  console.log('[CreateCharacter] canCreate check:', {
+    hasName,
+    hasTriggerWord,
+    hasImageOrDataset: !!hasImageOrDataset,
+    validParams,
+    selectedImage: selectedImage.value,
+    datasetId: form.value.datasetId
+  })
+
+  return hasName && hasTriggerWord && hasImageOrDataset && validParams
 })
 
 const validateTrainingParameters = () => {
-  // Validate basic parameters
-  if (form.value.steps < 100 || form.value.steps > 10000) return false
-  if (form.value.learning_rate < 0.0001 || form.value.learning_rate > 0.01) return false
-  if (form.value.batch_size < 1 || form.value.batch_size > 16) return false
-  if (form.value.rank_dim < 4 || form.value.rank_dim > 256) return false
-  if (form.value.train_dim < 256 || form.value.train_dim > 2048) return false
+  // Validate basic parameters (convert to numbers in case they're strings from select)
+  const steps = Number(form.value.steps)
+  const learningRate = Number(form.value.learning_rate)
+  const batchSize = Number(form.value.batch_size)
+  const rankDim = Number(form.value.rank_dim)
+  const trainDim = Number(form.value.train_dim)
+
+  if (isNaN(steps) || steps < 100 || steps > 10000) return false
+  if (isNaN(learningRate) || learningRate < 0.0001 || learningRate > 0.01) return false
+  if (isNaN(batchSize) || batchSize < 1 || batchSize > 16) return false
+  if (isNaN(rankDim) || rankDim < 4 || rankDim > 256) return false
+  if (isNaN(trainDim) || trainDim < 256 || trainDim > 2048) return false
 
   // Validate MV Adapter if enabled
   if (form.value.mvAdapterConfig.enabled) {
@@ -550,19 +580,38 @@ const validateTrainingParameters = () => {
 }
 
 const loadMediaFiles = async () => {
+  isLoadingMedia.value = true
   try {
+    console.log('[CreateCharacter] Loading media files...')
     const response = await mediaApi.list()
+    console.log('[CreateCharacter] Media files loaded:', response)
     mediaFiles.value = response.files
+    console.log('[CreateCharacter] mediaFiles.value set to:', mediaFiles.value)
   } catch (error) {
-    console.error('Failed to load media files:', error)
+    console.error('[CreateCharacter] Failed to load media files:', error)
+  } finally {
+    isLoadingMedia.value = false
   }
+}
+
+const openMediaLibrary = () => {
+  console.log('[CreateCharacter] Opening media library, files available:', mediaFiles.value.length)
+  if (mediaFiles.value.length === 0) {
+    toast.warning('No images in library. Please upload images first.')
+    return
+  }
+  showMediaLibrary.value = true
 }
 
 const loadDatasets = async () => {
   try {
+    console.log('[CreateCharacter] Loading datasets...')
     const response = await datasetApi.getDatasets()
+    console.log('[CreateCharacter] Datasets loaded:', response)
     datasets.value = response.datasets.filter(d => d.status === 'ready')
+    console.log('[CreateCharacter] Ready datasets:', datasets.value)
   } catch (error) {
+    console.error('[CreateCharacter] Failed to load datasets:', error)
     toast.error('Failed to load datasets')
   }
 }
@@ -628,8 +677,10 @@ const handleDrop = (event: DragEvent) => {
 }
 
 const selectImageFromLibrary = (file: MediaFile) => {
+  console.log('[CreateCharacter] Selecting image from library:', file)
   selectedImage.value = file
   showMediaLibrary.value = false
+  console.log('[CreateCharacter] selectedImage set to:', selectedImage.value)
 }
 
 const createCharacter = async () => {
@@ -671,10 +722,23 @@ const formatFileSize = (bytes: number): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
+// Debug watcher for media library modal
+watch(showMediaLibrary, (newVal) => {
+  if (newVal) {
+    console.log('[CreateCharacter] Media library modal opened')
+    console.log('[CreateCharacter] Available media files:', mediaFiles.value)
+    console.log('[CreateCharacter] Media files count:', mediaFiles.value.length)
+  }
+})
+
 onMounted(async () => {
-  loadMediaFiles()
-  await loadDatasets()
-  await loadModelsAndConfig()
+  console.log('[CreateCharacter] Component mounted, loading data...')
+  // Load all data in parallel
+  await Promise.all([
+    loadMediaFiles(),
+    loadDatasets(),
+    loadModelsAndConfig()
+  ])
 
   // Check if dataset is pre-selected via query parameter
   const datasetId = route.query.dataset as string
