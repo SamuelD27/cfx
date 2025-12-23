@@ -201,7 +201,7 @@
     <!-- Dataset Creation Modal -->
     <DatasetModal
       v-if="showDatasetModal"
-      :files="files"
+      :files="mediaFiles"
       @close="showDatasetModal = false"
       @created="handleDatasetCreated"
     />

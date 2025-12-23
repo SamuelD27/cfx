@@ -684,7 +684,22 @@ const selectImageFromLibrary = (file: MediaFile) => {
 }
 
 const createCharacter = async () => {
-  if (!canCreate.value) return
+  console.log('[CreateCharacter] createCharacter called, canCreate:', canCreate.value)
+
+  if (!canCreate.value) {
+    console.log('[CreateCharacter] Cannot create - validation failed')
+    // Show which validation is failing
+    const hasName = form.value.name.trim().length > 0
+    const hasTriggerWord = form.value.triggerWord.trim().length > 0
+    const hasImageOrDataset = selectedImage.value || form.value.datasetId
+    const validParams = validateTrainingParameters()
+
+    if (!hasName) toast.error('Character name is required')
+    else if (!hasTriggerWord) toast.error('Trigger word is required')
+    else if (!hasImageOrDataset) toast.error('Please select an image or dataset')
+    else if (!validParams) toast.error('Invalid training parameters')
+    return
+  }
 
   isCreating.value = true
   try {
@@ -692,12 +707,17 @@ const createCharacter = async () => {
 
     // If selected image is a File (newly uploaded), upload it first
     if (selectedImage.value instanceof File) {
+      console.log('[CreateCharacter] Uploading new file...')
       const uploadedFile = await mediaApi.upload(selectedImage.value)
       imagePath = uploadedFile.file_path
-    } else {
+      console.log('[CreateCharacter] File uploaded, path:', imagePath)
+    } else if (selectedImage.value) {
       // Use existing media file path
       imagePath = (selectedImage.value as MediaFile).file_path
+      console.log('[CreateCharacter] Using existing file path:', imagePath)
     }
+
+    console.log('[CreateCharacter] Creating character with:', { name: form.value.name, imagePath })
 
     // Create character
     const character = await charactersApi.create({
@@ -705,9 +725,11 @@ const createCharacter = async () => {
       input_image_path: imagePath
     })
 
+    console.log('[CreateCharacter] Character created:', character)
     toast.success('Character created successfully!')
     router.push(`/characters/${character.id}`)
   } catch (error: any) {
+    console.error('[CreateCharacter] Error creating character:', error)
     toast.error(error.response?.data?.detail || 'Failed to create character')
   } finally {
     isCreating.value = false
