@@ -2,8 +2,12 @@
 # CharForgex Docker Entrypoint
 # ============================
 # Starts SSH, GUI services, and keeps container alive for RunPod/cloud deployment
+# Automatically runs first-time setup if not already completed
 
 set -e
+
+SETUP_MARKER="/app/.setup_complete"
+SETUP_LOG="/tmp/setup.log"
 
 # Generate SSH host keys if they don't exist
 if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
@@ -24,6 +28,33 @@ if [ -f /app/.env ]; then
     set -a
     source /app/.env
     set +a
+fi
+
+# ============================================================
+# FIRST-TIME SETUP (runs once, downloads ~50GB of models)
+# ============================================================
+if [ ! -f "$SETUP_MARKER" ]; then
+    echo ""
+    echo "================================================="
+    echo "  FIRST-TIME SETUP - This may take 30-60 minutes"
+    echo "  Downloading models and dependencies (~50GB)"
+    echo "  Progress logged to: $SETUP_LOG"
+    echo "================================================="
+    echo ""
+
+    cd /app
+
+    # Run setup.sh and capture output
+    echo "[entrypoint] Running setup.sh..."
+    if bash setup.sh 2>&1 | tee "$SETUP_LOG"; then
+        # Mark setup as complete only on success
+        date > "$SETUP_MARKER"
+        echo "[entrypoint] Setup completed successfully!"
+    else
+        echo "[entrypoint] ERROR: Setup failed! Check $SETUP_LOG for details."
+        echo "[entrypoint] You can re-run manually with: cd /app && bash setup.sh"
+        # Continue anyway so user can SSH in and debug
+    fi
 fi
 
 # Create backend .env with auth disabled if it doesn't exist
@@ -85,14 +116,20 @@ echo "Logs:"
 echo "  - Backend:  tail -f /tmp/backend.log"
 echo "  - Frontend: tail -f /tmp/frontend.log"
 echo "  - ComfyUI:  tail -f /tmp/comfyui.log"
+echo "  - Setup:    cat /tmp/setup.log"
 echo ""
-echo "FIRST RUN SETUP:"
-echo "  bash setup.sh    # Downloads ~50GB of models"
+if [ -f "$SETUP_MARKER" ]; then
+    echo "Setup Status: COMPLETE ($(cat $SETUP_MARKER))"
+else
+    echo "Setup Status: NOT COMPLETE - run 'cd /app && bash setup.sh'"
+fi
 echo ""
 echo "TRAINING:"
+echo "  source /app/.venv/bin/activate"
 echo "  python train_character.py --name \"NAME\" --input \"/path/to/image.jpg\""
 echo ""
 echo "INFERENCE:"
+echo "  source /app/.venv/bin/activate"
 echo "  python test_character.py --character_name \"NAME\" --prompt \"Your prompt\""
 echo ""
 echo "================================================="

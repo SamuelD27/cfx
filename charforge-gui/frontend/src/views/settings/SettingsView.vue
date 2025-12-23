@@ -116,7 +116,7 @@
             <div class="flex items-center">
               <CheckCircle2 v-if="result.valid" class="mr-2 h-5 w-5 text-green-500" />
               <XCircle v-else class="mr-2 h-5 w-5 text-red-500" />
-              <span class="font-medium">{{ key.replace('_', ' ') }}</span>
+              <span class="font-medium">{{ String(key).replace('_', ' ') }}</span>
             </div>
             <p class="mt-1 text-sm" :class="result.valid ? 'text-green-700' : 'text-red-700'">
               {{ result.message }}
@@ -162,7 +162,7 @@ const envSettings = ref({
   GENERATION_SYSTEM_PROMPT: ''
 })
 
-const validationResults = ref<any>({})
+const validationResults = ref<Record<string, { valid: boolean; message: string }>>({})
 const isSaving = ref(false)
 const isValidating = ref(false)
 const toast = useToast()

@@ -45,6 +45,8 @@ class AdvancedTrainingConfig(BaseModel):
     max_saves: int = 5
 
 class TrainingRequest(BaseModel):
+    model_config = {"protected_namespaces": ()}  # Allow model_ prefix in field names
+
     character_id: int
     # Basic parameters
     steps: Optional[int] = 800
@@ -54,8 +56,8 @@ class TrainingRequest(BaseModel):
     rank_dim: Optional[int] = 8
     pulidflux_images: Optional[int] = 0
 
-    # Model configuration
-    model_config: Optional[ModelConfig] = ModelConfig()
+    # Model configuration (renamed from model_config which is reserved in Pydantic v2)
+    model_settings: Optional[ModelConfig] = ModelConfig()
 
     # MV Adapter configuration
     mv_adapter_config: Optional[MVAdapterConfig] = MVAdapterConfig()
@@ -71,12 +73,19 @@ class TrainingRequest(BaseModel):
 class TrainingResponse(BaseModel):
     id: int
     character_id: int
+    character_name: Optional[str] = None  # Populated when joining with Character
     status: str
     progress: float
+    steps: Optional[int] = None
+    batch_size: Optional[int] = None
+    learning_rate: Optional[float] = None
+    train_dim: Optional[int] = None
+    rank_dim: Optional[int] = None
+    pulidflux_images: Optional[int] = None
     created_at: datetime
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
-    
+
     class Config:
         from_attributes = True
 
@@ -256,8 +265,8 @@ async def start_training(
         )
 
     # Validate model configuration if provided
-    if request.model_config:
-        if request.model_config.dtype not in ["float16", "float32", "bfloat16"]:
+    if request.model_settings:
+        if request.model_settings.dtype not in ["float16", "float32", "bfloat16"]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid data type. Must be float16, float32, or bfloat16"
@@ -333,15 +342,15 @@ async def run_training_background(
             name=character.name,
             input_image=character.input_image_path,
             work_dir=character.work_dir,
-            steps=steps,
-            batch_size=batch_size,
-            learning_rate=learning_rate,
-            train_dim=train_dim,
-            rank_dim=rank_dim,
+            steps=request.steps or 800,
+            batch_size=request.batch_size or 1,
+            learning_rate=request.learning_rate or 8e-4,
+            train_dim=request.train_dim or 512,
+            rank_dim=request.rank_dim or 8,
             pulidflux_images=request.pulidflux_images or 0,
 
             # Model configuration
-            model_config=request.model_config or ModelConfig(),
+            model_config=request.model_settings or ModelConfig(),
             mv_adapter_config=request.mv_adapter_config or MVAdapterConfig(),
             advanced_config=request.advanced_config or AdvancedTrainingConfig(),
 

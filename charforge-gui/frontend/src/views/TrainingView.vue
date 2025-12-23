@@ -256,7 +256,7 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import Card from '@/components/ui/Card.vue'
 import Button from '@/components/ui/Button.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
-import { trainingApi, type TrainingSession } from '@/services/api'
+import { trainingApi, charactersApi, type TrainingSession } from '@/services/api'
 
 const route = useRoute()
 const toast = useToast()
@@ -279,12 +279,34 @@ const historySessions = computed(() =>
 const loadTrainingSessions = async () => {
   isLoading.value = true
   try {
-    // Load all training sessions
-    // Note: This would need to be implemented in the API to get all sessions for a user
-    // For now, we'll simulate with empty data
-    sessions.value = []
+    // Get all characters first
+    const characters = await charactersApi.list()
+
+    // For each character, get its training sessions
+    const allSessions: TrainingSession[] = []
+    for (const character of characters) {
+      try {
+        const charSessions = await trainingApi.getTrainingSessions(character.id)
+        // Add character name to each session
+        for (const session of charSessions) {
+          allSessions.push({
+            ...session,
+            character_name: character.name
+          })
+        }
+      } catch (e) {
+        // Skip characters with no training sessions
+        console.log(`No training sessions for ${character.name}`)
+      }
+    }
+
+    // Sort by created_at descending (newest first)
+    sessions.value = allSessions.sort((a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
   } catch (error: any) {
     toast.error('Failed to load training sessions')
+    console.error('Error loading training sessions:', error)
   } finally {
     isLoading.value = false
   }

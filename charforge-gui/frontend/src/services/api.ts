@@ -61,13 +61,30 @@ export interface Character {
   work_dir: string
   created_at: string
   completed_at?: string
+  // Optional fields from create/available-characters endpoints
+  input_image_path?: string
+  lora_path?: string
+  preview_image?: string
+}
+
+// Extended MediaFile for local file uploads with preview
+export interface SelectedImage extends Partial<MediaFile> {
+  preview?: string
+  name?: string
 }
 
 export interface TrainingSession {
   id: number
   character_id: number
+  character_name?: string
   status: string
   progress: number
+  steps?: number
+  batch_size?: number
+  learning_rate?: number
+  train_dim?: number
+  rank_dim?: number
+  pulidflux_images?: number
   created_at: string
   started_at?: string
   completed_at?: string
