@@ -386,6 +386,28 @@
         <!-- Configuration Summary -->
         <ModelConfigSummary :config="form" />
 
+        <!-- Debug: Show validation status -->
+        <div class="p-3 bg-muted rounded-lg text-sm mb-4">
+          <p class="font-medium mb-2">Validation Status:</p>
+          <ul class="space-y-1">
+            <li :class="form.name.trim().length > 0 ? 'text-green-600' : 'text-red-600'">
+              {{ form.name.trim().length > 0 ? '✓' : '✗' }} Name: {{ form.name || '(empty)' }}
+            </li>
+            <li :class="form.triggerWord.trim().length > 0 ? 'text-green-600' : 'text-red-600'">
+              {{ form.triggerWord.trim().length > 0 ? '✓' : '✗' }} Trigger Word: {{ form.triggerWord || '(empty)' }}
+            </li>
+            <li :class="selectedImage || form.datasetId ? 'text-green-600' : 'text-red-600'">
+              {{ selectedImage || form.datasetId ? '✓' : '✗' }} Image/Dataset: {{ selectedImage ? 'Selected' : form.datasetId ? 'Dataset ' + form.datasetId : '(none)' }}
+            </li>
+            <li :class="validateTrainingParameters() ? 'text-green-600' : 'text-red-600'">
+              {{ validateTrainingParameters() ? '✓' : '✗' }} Training Params (steps={{ form.steps }}, lr={{ form.learning_rate }}, dim={{ form.train_dim }})
+            </li>
+          </ul>
+          <p class="mt-2 font-medium" :class="canCreate ? 'text-green-600' : 'text-red-600'">
+            canCreate: {{ canCreate }}
+          </p>
+        </div>
+
         <!-- Actions -->
         <div class="flex justify-end space-x-3">
           <Button type="button" variant="outline" @click="$router.push('/characters')">
@@ -562,20 +584,59 @@ const validateTrainingParameters = () => {
   const rankDim = Number(form.value.rank_dim)
   const trainDim = Number(form.value.train_dim)
 
-  if (isNaN(steps) || steps < 100 || steps > 10000) return false
-  if (isNaN(learningRate) || learningRate < 0.0001 || learningRate > 0.01) return false
-  if (isNaN(batchSize) || batchSize < 1 || batchSize > 16) return false
-  if (isNaN(rankDim) || rankDim < 4 || rankDim > 256) return false
-  if (isNaN(trainDim) || trainDim < 256 || trainDim > 2048) return false
+  console.log('[CreateCharacter] validateTrainingParameters:', {
+    steps, learningRate, batchSize, rankDim, trainDim,
+    raw: {
+      steps: form.value.steps,
+      learning_rate: form.value.learning_rate,
+      batch_size: form.value.batch_size,
+      rank_dim: form.value.rank_dim,
+      train_dim: form.value.train_dim
+    }
+  })
+
+  if (isNaN(steps) || steps < 100 || steps > 10000) {
+    console.log('[CreateCharacter] FAILED: steps validation', { steps, min: 100, max: 10000 })
+    return false
+  }
+  if (isNaN(learningRate) || learningRate < 0.0001 || learningRate > 0.01) {
+    console.log('[CreateCharacter] FAILED: learningRate validation', { learningRate, min: 0.0001, max: 0.01 })
+    return false
+  }
+  if (isNaN(batchSize) || batchSize < 1 || batchSize > 16) {
+    console.log('[CreateCharacter] FAILED: batchSize validation', { batchSize, min: 1, max: 16 })
+    return false
+  }
+  if (isNaN(rankDim) || rankDim < 4 || rankDim > 256) {
+    console.log('[CreateCharacter] FAILED: rankDim validation', { rankDim, min: 4, max: 256 })
+    return false
+  }
+  if (isNaN(trainDim) || trainDim < 256 || trainDim > 2048) {
+    console.log('[CreateCharacter] FAILED: trainDim validation', { trainDim, min: 256, max: 2048 })
+    return false
+  }
 
   // Validate MV Adapter if enabled
   if (form.value.mvAdapterConfig.enabled) {
-    if (form.value.mvAdapterConfig.numViews < 4 || form.value.mvAdapterConfig.numViews > 12) return false
-    if (form.value.mvAdapterConfig.guidanceScale < 1.0 || form.value.mvAdapterConfig.guidanceScale > 20.0) return false
-    if (form.value.mvAdapterConfig.height < 512 || form.value.mvAdapterConfig.height > 2048) return false
-    if (form.value.mvAdapterConfig.width < 512 || form.value.mvAdapterConfig.width > 2048) return false
+    if (form.value.mvAdapterConfig.numViews < 4 || form.value.mvAdapterConfig.numViews > 12) {
+      console.log('[CreateCharacter] FAILED: MV numViews validation')
+      return false
+    }
+    if (form.value.mvAdapterConfig.guidanceScale < 1.0 || form.value.mvAdapterConfig.guidanceScale > 20.0) {
+      console.log('[CreateCharacter] FAILED: MV guidanceScale validation')
+      return false
+    }
+    if (form.value.mvAdapterConfig.height < 512 || form.value.mvAdapterConfig.height > 2048) {
+      console.log('[CreateCharacter] FAILED: MV height validation')
+      return false
+    }
+    if (form.value.mvAdapterConfig.width < 512 || form.value.mvAdapterConfig.width > 2048) {
+      console.log('[CreateCharacter] FAILED: MV width validation')
+      return false
+    }
   }
 
+  console.log('[CreateCharacter] validateTrainingParameters: ALL PASSED')
   return true
 }
 
