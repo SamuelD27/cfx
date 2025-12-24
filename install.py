@@ -41,7 +41,7 @@ def run_cmd(command):
 def install_dependencies():
     """Install system dependencies and Python packages."""
     print("📦 Installing dependencies...")
-    run_cmd("sudo apt-get update && sudo apt-get install -y git wget curl libgl1-mesa-glx libglib2.0-0 tmux emacs git-lfs")
+    run_cmd("apt-get update && apt-get install -y git wget curl libgl1-mesa-glx libglib2.0-0 tmux emacs git-lfs")
     print("✅ Dependencies installed.")
 
 
