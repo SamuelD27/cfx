@@ -6,12 +6,14 @@ import os
 import sys
 import torch
 from dataclasses import dataclass
+from pathlib import Path
 from dotenv import load_dotenv
 
 from helpers import run_subprocess
 from training.generate_sheet import timing
 
-load_dotenv()
+# Load .env from the script's directory
+load_dotenv(Path(__file__).parent / ".env")
 
 from training.generate_sheet import generate_char_sheet
 

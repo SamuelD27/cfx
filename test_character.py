@@ -2,6 +2,7 @@ import argparse
 import os
 import torch
 from diffusers import FluxPipeline
+from pathlib import Path
 from dotenv import load_dotenv
 from io import BytesIO
 
@@ -9,7 +10,8 @@ from helpers import find_character_lora, optimize_prompt
 from inference.postprocess import FaceEnhancer
 from inference.safety import SafetyChecker, create_blank_image
 
-load_dotenv()
+# Load .env from the script's directory
+load_dotenv(Path(__file__).parent / ".env")
 
 
 class LoRAImageGen:

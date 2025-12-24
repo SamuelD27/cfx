@@ -5,12 +5,14 @@ import fal_client
 import os
 import time
 import random
+from pathlib import Path
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from typing import List, Optional
 
-load_dotenv()
+# Load .env from repo root (parent directory)
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 
 def generate_pulidflux_prompts(

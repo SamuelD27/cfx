@@ -110,14 +110,18 @@ class CharForgeIntegration:
     def setup_environment(self, env_vars: Dict[str, str]) -> Dict[str, str]:
         """Set up environment variables for CharForge."""
         env = os.environ.copy()
-        env.update({
-            'APP_PATH': str(self.charforge_root),
-            'HF_HOME': env_vars.get('HF_HOME', ''),
-            'HF_TOKEN': env_vars.get('HF_TOKEN', ''),
-            'CIVITAI_API_KEY': env_vars.get('CIVITAI_API_KEY', ''),
-            'GOOGLE_API_KEY': env_vars.get('GOOGLE_API_KEY', ''),
-            'FAL_KEY': env_vars.get('FAL_KEY', ''),
-        })
+
+        # Always set APP_PATH (required)
+        env['APP_PATH'] = str(self.charforge_root)
+
+        # Only set non-empty environment variables
+        # This allows load_dotenv() in subprocess to load from .env file
+        # when keys are not configured in GUI settings
+        for key in ['HF_HOME', 'HF_TOKEN', 'CIVITAI_API_KEY', 'GOOGLE_API_KEY', 'FAL_KEY']:
+            value = env_vars.get(key, '')
+            if value:  # Only set if non-empty
+                env[key] = value
+
         return env
 
     def _validate_config(self, config) -> bool:

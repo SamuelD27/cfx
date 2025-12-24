@@ -241,7 +241,7 @@ def upscale_image(image_path, output_path=None, scale=1.5, model="RealESRGAN_x4p
                   output_format="png"):
     """
     Upscale an image using fal.ai's ESRGAN service (synchronous version)
-    
+
     Args:
         image_path: Path to the image file
         output_path: Path where the upscaled image will be saved (default: None, will return PIL Image)
@@ -249,7 +249,7 @@ def upscale_image(image_path, output_path=None, scale=1.5, model="RealESRGAN_x4p
         model: Model to use (default: "RealESRGAN_x4plus")
         face_enhance: Whether to enhance faces (default: True)
         output_format: Output image format (default: "png")
-    
+
     Returns:
         If output_path is provided: Path to the saved image
         If output_path is None: PIL Image of the upscaled result
