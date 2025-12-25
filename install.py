@@ -22,10 +22,19 @@ print("ComfyUI path: ", COMFYUI_PATH)
 os.environ["GIT_LFS_SKIP_SMUDGE"] = "1"
 
 
+def is_in_venv():
+    """Check if we're running inside a virtual environment."""
+    import sys
+    return hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix)
+
+
 def pip_install(platform, cmd):
     if platform == PLATFORM_SERVERLESS:
         return f"{cmd} --system --compile-bytecode"
     else:
+        # If not in a venv, use --system (e.g., Docker with pre-installed deps)
+        if not is_in_venv():
+            return f"{cmd} --system --cache-dir {os.environ['PIP_CACHE_DIR']}"
         return f"{cmd} --cache-dir {os.environ['PIP_CACHE_DIR']}"
 
 
