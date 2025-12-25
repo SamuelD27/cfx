@@ -29,6 +29,57 @@ def pip_install(platform, cmd):
         return f"{cmd} --cache-dir {os.environ['PIP_CACHE_DIR']}"
 
 
+def is_nvdiffrast_installed():
+    """Check if nvdiffrast is already installed."""
+    try:
+        import nvdiffrast.torch
+        return True
+    except ImportError:
+        return False
+
+
+def install_requirements_with_nvdiffrast_handling(requirements_path, platform):
+    """Install requirements.txt, handling nvdiffrast specially.
+
+    nvdiffrast requires --no-build-isolation flag which uv doesn't support.
+    This function filters out nvdiffrast and installs it with pip if needed.
+    """
+    # Read requirements file
+    with open(requirements_path, 'r') as f:
+        lines = f.readlines()
+
+    # Check if nvdiffrast is in requirements
+    has_nvdiffrast = any('nvdiffrast' in line.lower() for line in lines)
+
+    if has_nvdiffrast:
+        # Check if already installed
+        if is_nvdiffrast_installed():
+            print("  ✓ nvdiffrast already installed, filtering from requirements...")
+        else:
+            # Install nvdiffrast first with pip (not uv)
+            print("  📦 Installing nvdiffrast with special build flags...")
+            exit_code = os.system("pip install git+https://github.com/NVlabs/nvdiffrast.git --no-build-isolation")
+            if exit_code != 0:
+                print("  ⚠️ nvdiffrast installation failed, continuing anyway...")
+
+        # Create filtered requirements without nvdiffrast
+        filtered_lines = [line for line in lines if 'nvdiffrast' not in line.lower()]
+
+        # Write to temp file
+        temp_req_path = requirements_path + '.filtered'
+        with open(temp_req_path, 'w') as f:
+            f.writelines(filtered_lines)
+
+        # Install filtered requirements with uv
+        run_cmd(pip_install(platform, f"uv pip install -r {temp_req_path}"))
+
+        # Clean up temp file
+        os.remove(temp_req_path)
+    else:
+        # No nvdiffrast, install normally
+        run_cmd(pip_install(platform, f"uv pip install -r {requirements_path}"))
+
+
 def run_cmd(command):
     """Run a shell command"""
     print(f"🔄 Running: {command}")
@@ -63,7 +114,7 @@ def install_git_repo(repo_url, install_path, requirements=False, submodules=Fals
     if submodules:
         run_cmd("git submodule update --init --recursive")
     if requirements:
-        run_cmd(pip_install(platform, "uv pip install -r requirements.txt"))
+        install_requirements_with_nvdiffrast_handling("requirements.txt", platform)
 
     print(f"✅ {os.path.basename(install_path)} installed and updated.")
     os.chdir(original_dir)
@@ -94,7 +145,7 @@ def install_modules(platform=PLATFORM_HOSTED):
                 if os.path.exists(requirements_path):
                     print(f"📦 Installing dependencies for {submodule_dir}...")
                     os.chdir(submodule_dir)
-                    run_cmd(pip_install(platform, "uv pip install -r requirements.txt"))
+                    install_requirements_with_nvdiffrast_handling("requirements.txt", platform)
                     os.chdir(original_dir)
                 else:
                     print(f"ℹ️ No requirements.txt found for {submodule_dir}")
@@ -124,7 +175,7 @@ def install_modules(platform=PLATFORM_HOSTED):
                     if os.path.exists(os.path.join(submodule_path, "requirements.txt")):
                         print(f"📦 Installing dependencies for {submodule_path}...")
                         os.chdir(submodule_path)
-                        run_cmd(pip_install(platform, "uv pip install -r requirements.txt"))
+                        install_requirements_with_nvdiffrast_handling("requirements.txt", platform)
                         os.chdir(original_dir)
 
     # Make CLI wrapper scripts executable

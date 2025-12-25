@@ -112,8 +112,8 @@ RUN test -d /app/ai_toolkit && echo "OK: ai_toolkit submodule present" || \
 RUN test -d /app/LoRACaptioner && echo "OK: LoRACaptioner submodule present" || \
     (echo "ERROR: LoRACaptioner submodule missing. Clone with --recursive" && exit 1)
 
-# Create directories for runtime data
-RUN mkdir -p /app/scratch /app/ComfyUI/models/checkpoints /app/ComfyUI/models/loras
+# Create directories for runtime data (ComfyUI dirs created after clone below)
+RUN mkdir -p /app/scratch
 
 # Install backend dependencies
 RUN cd /app/charforge-gui/backend && \
@@ -121,6 +121,45 @@ RUN cd /app/charforge-gui/backend && \
 
 # Install frontend dependencies
 RUN cd /app/charforge-gui/frontend && npm install
+
+# ============================================================
+# CRITICAL: Install missing ML dependencies
+# These were discovered during troubleshooting session 2024-12-24
+# ============================================================
+
+# Install setuptools/wheel first (required for nvdiffrast build)
+RUN pip install --upgrade pip setuptools wheel
+
+# Clone and install ComfyUI (not included in base image)
+RUN git clone https://github.com/comfyanonymous/ComfyUI.git /app/ComfyUI && \
+    cd /app/ComfyUI && \
+    pip install -r requirements.txt && \
+    mkdir -p /app/ComfyUI/models/checkpoints /app/ComfyUI/models/loras
+
+# Install nvdiffrast with CUDA support (must use pip, not uv, with --no-build-isolation)
+RUN cd /tmp && \
+    git clone https://github.com/NVlabs/nvdiffrast.git && \
+    cd nvdiffrast && \
+    pip install . --no-build-isolation
+
+# Install HuggingFace packages (diffusers must be >= 0.36.0)
+RUN pip install diffusers>=0.36.0 transformers accelerate
+
+# Install ML utilities
+RUN pip install omegaconf timm einops
+
+# Install image/3D processing packages
+RUN pip install trimesh pyrender rembg
+
+# Install visualization packages
+RUN pip install matplotlib opencv-python-headless safetensors
+
+# Install Google GenAI packages (for Gemini captioning)
+RUN pip install google-genai google-generativeai
+
+# ============================================================
+# END: Missing ML dependencies
+# ============================================================
 
 # Make entrypoint executable
 RUN chmod +x /app/docker-entrypoint.sh
