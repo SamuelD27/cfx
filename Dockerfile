@@ -17,6 +17,13 @@
 #     --env-file .env \
 #     charforgex
 #
+# REQUIRED ENV VARS (in .env file or via -e flags):
+#   HF_TOKEN=hf_xxx          # HuggingFace token (for model downloads)
+#   HF_HOME=/hf_cache        # HuggingFace cache directory
+#   CIVITAI_API_KEY=xxx      # CivitAI token (for checkpoint downloads)
+#   GOOGLE_API_KEY=xxx       # Google Gemini API (for captioning)
+#   FAL_KEY=xxx              # fal.ai API (for upscaling)
+#
 # RUNPOD PORTS:
 #   - 22: SSH access
 #   - 5173: GUI frontend

@@ -28,6 +28,22 @@ if [ -f /app/.env ]; then
     set -a
     source /app/.env
     set +a
+else
+    # Create .env from environment variables if they exist (from --env-file or -e flags)
+    if [ -n "$HF_TOKEN" ] || [ -n "$CIVITAI_API_KEY" ] || [ -n "$GOOGLE_API_KEY" ]; then
+        echo "[entrypoint] Creating /app/.env from environment variables..."
+        cat > /app/.env << ENVEOF
+HF_TOKEN=${HF_TOKEN:-}
+HF_HOME=${HF_HOME:-/hf_cache}
+CIVITAI_API_KEY=${CIVITAI_API_KEY:-}
+GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+FAL_KEY=${FAL_KEY:-}
+ENVEOF
+        echo "[entrypoint] Created /app/.env with provided credentials"
+    else
+        echo "[entrypoint] WARNING: No .env file found and no API keys in environment."
+        echo "[entrypoint] Model downloads may fail. Provide keys via --env-file or -e flags."
+    fi
 fi
 
 # ============================================================
@@ -125,12 +141,10 @@ else
 fi
 echo ""
 echo "TRAINING:"
-echo "  source /app/.venv/bin/activate"
-echo "  python train_character.py --name \"NAME\" --input \"/path/to/image.jpg\""
+echo "  cd /app && python train_character.py --name \"NAME\" --input \"/path/to/image.jpg\""
 echo ""
 echo "INFERENCE:"
-echo "  source /app/.venv/bin/activate"
-echo "  python test_character.py --character_name \"NAME\" --prompt \"Your prompt\""
+echo "  cd /app && python test_character.py --character_name \"NAME\" --prompt \"Your prompt\""
 echo ""
 echo "================================================="
 echo "Container is ready. Keeping alive..."
