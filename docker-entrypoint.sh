@@ -34,7 +34,7 @@ else
         echo "[entrypoint] Creating /app/.env from environment variables..."
         cat > /app/.env << ENVEOF
 HF_TOKEN=${HF_TOKEN:-}
-HF_HOME=${HF_HOME:-/hf_cache}
+HF_HOME=${HF_HOME:-/app/hf_cache}
 CIVITAI_API_KEY=${CIVITAI_API_KEY:-}
 GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
 FAL_KEY=${FAL_KEY:-}

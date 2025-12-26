@@ -5,7 +5,7 @@
 
 set -e
 
-RUNTIME_DIR="/workspace/CharForgex/runtime"
+RUNTIME_DIR="/app/runtime"
 ARCHIVES_DIR="$RUNTIME_DIR/archives"
 LOGS_DIR="$RUNTIME_DIR/logs"
 
@@ -28,7 +28,7 @@ create_archive() {
     echo "" >> "$ARCHIVE_DIR/env_snapshot.txt"
     
     echo "Git Commit:" >> "$ARCHIVE_DIR/env_snapshot.txt"
-    cd /workspace/CharForgex && git log -1 --format="%H %s" >> "$ARCHIVE_DIR/env_snapshot.txt" 2>/dev/null || echo "N/A" >> "$ARCHIVE_DIR/env_snapshot.txt"
+    cd /app && git log -1 --format="%H %s" >> "$ARCHIVE_DIR/env_snapshot.txt" 2>/dev/null || echo "N/A" >> "$ARCHIVE_DIR/env_snapshot.txt"
     echo "" >> "$ARCHIVE_DIR/env_snapshot.txt"
     
     echo "Python Version:" >> "$ARCHIVE_DIR/env_snapshot.txt"
@@ -51,7 +51,7 @@ create_archive() {
     echo "" >> "$ARCHIVE_DIR/env_snapshot.txt"
     
     echo "Disk Usage:" >> "$ARCHIVE_DIR/env_snapshot.txt"
-    df -h /workspace >> "$ARCHIVE_DIR/env_snapshot.txt"
+    df -h /app >> "$ARCHIVE_DIR/env_snapshot.txt"
     
     # Capture current logs
     cp /tmp/backend.log "$ARCHIVE_DIR/backend.log" 2>/dev/null || touch "$ARCHIVE_DIR/backend.log"
@@ -64,7 +64,7 @@ create_archive() {
     
     echo "" >> "$ARCHIVE_DIR/dependencies.txt"
     echo "=== Node Dependencies ===" >> "$ARCHIVE_DIR/dependencies.txt"
-    cd /workspace/CharForgex/charforge-gui/frontend && npm list --depth=0 2>/dev/null | head -30 >> "$ARCHIVE_DIR/dependencies.txt" || echo "N/A" >> "$ARCHIVE_DIR/dependencies.txt"
+    cd /app/charforge-gui/frontend && npm list --depth=0 2>/dev/null | head -30 >> "$ARCHIVE_DIR/dependencies.txt" || echo "N/A" >> "$ARCHIVE_DIR/dependencies.txt"
     
     echo "$ARCHIVE_DIR"
 }

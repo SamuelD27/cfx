@@ -15,7 +15,7 @@ POD_ID = os.environ["RUNPOD_POD_ID"]
 character_name = "character_name"
 
 # Mount the scratch directory
-scratch_dir = "/workspace/CharForge/scratch"
+scratch_dir = "/app/scratch"
 app.mount("/loras", StaticFiles(directory=scratch_dir), name="loras")
 
 

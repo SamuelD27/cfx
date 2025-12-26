@@ -11,7 +11,7 @@ set -euo pipefail
 # ============================================================
 # CONFIGURATION
 # ============================================================
-CHARFORGE_ROOT="/workspace/CharForgex"
+CHARFORGE_ROOT="/app"
 RUNTIME_DIR="$CHARFORGE_ROOT/runtime"
 LOGS_DIR="$RUNTIME_DIR/logs"
 
@@ -38,12 +38,12 @@ mkdir -p "$PID_DIR" "$LOGS_DIR"
 setup_environment() {
     echo "[startup] Setting up environment..."
     
-    # Export critical paths
-    export HF_HOME=/workspace/hf_cache
-    export TORCH_HOME=/workspace/torch_cache
-    export TMPDIR=/workspace/CharForgex/runtime/tmp
-    export XDG_CACHE_HOME=/workspace/.cache
-    export PATH="/workspace/tools/node/bin:$PATH"
+    # Export critical paths (use /app for container disk storage)
+    export HF_HOME=/app/hf_cache
+    export TORCH_HOME=/app/torch_cache
+    export TMPDIR=/app/runtime/tmp
+    export XDG_CACHE_HOME=/app/.cache
+    # Node is installed system-wide in Docker image
     
     # Load API keys from .env
     if [ -f "$CHARFORGE_ROOT/.env" ]; then
@@ -85,9 +85,9 @@ check_dependencies() {
         pip install fastapi uvicorn opencv-python-headless safetensors matplotlib insightface onnxruntime -q 2>/dev/null || true
     fi
     
-    # Check Node
-    if ! command -v node &>/dev/null && [ -f /workspace/tools/node/bin/node ]; then
-        export PATH="/workspace/tools/node/bin:$PATH"
+    # Check Node (installed system-wide in Docker image)
+    if ! command -v node &>/dev/null; then
+        echo "[startup] WARNING: Node.js not found"
     fi
     
     echo "[startup] Dependencies OK"
