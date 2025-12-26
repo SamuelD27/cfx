@@ -390,6 +390,72 @@ def download_and_extract_antelopev2():
         print("✅ AntelopeV2 model already exists")
 
 
+def download_training_pipeline_models():
+    """
+    Pre-download models used by the training pipeline (MV-Adapter, SDXL, etc.).
+
+    This ensures training doesn't hang while downloading large models.
+    These models are cached in HF_HOME and reused across training runs.
+    """
+    print("\n📦 Pre-downloading training pipeline models...")
+
+    hf_home = os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
+    hf_token = os.environ.get("HF_TOKEN")
+
+    # Models needed for the training pipeline
+    pipeline_models = [
+        {
+            "name": "MV-Adapter",
+            "repo_id": "huanngzh/mv-adapter",
+            "description": "Multi-view adapter for character sheet generation"
+        },
+        {
+            "name": "SDXL Base",
+            "repo_id": "stabilityai/stable-diffusion-xl-base-1.0",
+            "description": "Base model for MV-Adapter"
+        },
+        {
+            "name": "Juggernaut XL",
+            "repo_id": "RunDiffusion/Juggernaut-XL-v9",
+            "description": "Alternative SDXL model"
+        },
+        {
+            "name": "SDXL VAE FP16",
+            "repo_id": "madebyollin/sdxl-vae-fp16-fix",
+            "description": "FP16 VAE for SDXL"
+        },
+        {
+            "name": "BiRefNet",
+            "repo_id": "ZhengPeng7/BiRefNet",
+            "description": "Background removal model"
+        },
+    ]
+
+    try:
+        from huggingface_hub import snapshot_download
+
+        for model in pipeline_models:
+            print(f"⬇️  Downloading {model['name']} ({model['repo_id']})...")
+            try:
+                snapshot_download(
+                    repo_id=model["repo_id"],
+                    cache_dir=hf_home,
+                    token=hf_token,
+                    ignore_patterns=["*.md", "*.txt", ".gitattributes"]  # Skip docs
+                )
+                print(f"✅ {model['name']} downloaded")
+            except Exception as e:
+                print(f"⚠️  Warning: Failed to download {model['name']}: {e}")
+                # Continue with other models
+
+        print("✅ Training pipeline models pre-downloaded")
+
+    except ImportError:
+        print("⚠️  huggingface_hub not installed, skipping pipeline model download")
+    except Exception as e:
+        print(f"⚠️  Warning: Failed to pre-download pipeline models: {e}")
+
+
 def install_custom_nodes(platform=PLATFORM_HOSTED):
     """Install all custom nodes for ComfyUI."""
     # Make sure we have the absolute path to ComfyUI_PATH
@@ -507,6 +573,7 @@ def full_install(cache_models=True, platform=PLATFORM_HOSTED):
     if platform == PLATFORM_HOSTED:
         download_huggingface_models(cache_models)
         download_external_models(cache_models)
+        download_training_pipeline_models()  # Pre-download MV-Adapter, SDXL, etc.
     final_steps(platform)
     print("✅ Setup Complete!")
 
