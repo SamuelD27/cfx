@@ -3,6 +3,10 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List, Optional
 import json
+import logging
+import os
+import traceback
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -10,6 +14,10 @@ from app.core.database import get_db, Character, TrainingSession, User
 from app.core.auth import get_current_user_optional
 from app.services.charforge_integration import CharForgeIntegration, CharacterConfig
 from app.services.settings_service import get_user_env_vars
+
+# Configure logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 router = APIRouter()
 
@@ -322,21 +330,33 @@ async def run_training_background(
 ):
     """Background task to run training."""
     db = next(get_db())
-    
+    request_id = str(uuid.uuid4())[:8]  # Short request ID for correlation
+
+    logger.info(f"[{request_id}] Starting training for session {session_id}, character '{character.name}'")
+
     try:
         # Update session status
         session = db.query(TrainingSession).filter(TrainingSession.id == session_id).first()
         session.status = "running"
         session.started_at = datetime.utcnow()
+
+        # Set up log file in work directory
+        log_dir = Path(character.work_dir)
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / f"training_{request_id}.log"
+        session.log_file = str(log_file)
         db.commit()
-        
+
+        logger.info(f"[{request_id}] Log file: {log_file}")
+
         # Update character status
         character.status = "training"
         db.commit()
-        
+
         # Get user environment variables
         env_vars = await get_user_env_vars(user_id, db)
-        
+        logger.info(f"[{request_id}] User env vars loaded: {list(env_vars.keys())}")
+
         # Create CharForge config
         config = CharacterConfig(
             name=character.name,
@@ -359,39 +379,78 @@ async def run_training_background(
             comfyui_vae=request.comfyui_vae or "",
             comfyui_lora=request.comfyui_lora or ""
         )
-        
+
+        logger.info(f"[{request_id}] Config: name={config.name}, input={config.input_image}, steps={config.steps}")
+
         # Progress callback
         def update_progress(progress: float, message: str):
             session.progress = progress
             db.commit()
-        
+            logger.debug(f"[{request_id}] Progress: {progress:.1f}% - {message}")
+
         # Run training
+        logger.info(f"[{request_id}] Starting charforge.run_training()")
         result = await charforge.run_training(config, env_vars, update_progress)
-        
+
+        # Write training output to log file
+        with open(log_file, 'w') as f:
+            f.write(f"=== Training Session {session_id} ===\n")
+            f.write(f"Request ID: {request_id}\n")
+            f.write(f"Character: {character.name}\n")
+            f.write(f"Started: {session.started_at}\n")
+            f.write(f"Success: {result.get('success', False)}\n")
+            f.write(f"\n=== Output ===\n")
+            f.write(result.get('output', 'No output'))
+            if result.get('error'):
+                f.write(f"\n\n=== Error ===\n{result['error']}")
+
         # Update session with results
-        session.status = "completed" if result["success"] else "failed"
-        session.completed_at = datetime.utcnow()
-        session.progress = 100.0 if result["success"] else session.progress
-        
-        # Update character status
-        character.status = "completed" if result["success"] else "failed"
         if result["success"]:
+            session.status = "completed"
+            session.progress = 100.0
+            character.status = "completed"
             character.completed_at = datetime.utcnow()
-        
+            logger.info(f"[{request_id}] Training completed successfully")
+        else:
+            session.status = "failed"
+            character.status = "failed"
+            error_msg = result.get('error', 'Unknown error')
+            logger.error(f"[{request_id}] Training failed: {error_msg}")
+            logger.error(f"[{request_id}] Output: {result.get('output', 'No output')[:500]}")
+
+        session.completed_at = datetime.utcnow()
         db.commit()
-        
+
     except Exception as e:
+        # Log the full exception with traceback
+        error_tb = traceback.format_exc()
+        logger.error(f"[{request_id}] Exception during training: {e}")
+        logger.error(f"[{request_id}] Traceback:\n{error_tb}")
+
+        # Write error to log file if possible
+        try:
+            if 'log_file' in dir() and log_file:
+                with open(log_file, 'a') as f:
+                    f.write(f"\n\n=== EXCEPTION ===\n{error_tb}")
+        except:
+            pass
+
         # Handle errors
         session = db.query(TrainingSession).filter(TrainingSession.id == session_id).first()
-        session.status = "failed"
-        session.completed_at = datetime.utcnow()
-        
-        character.status = "failed"
-        
+        if session:
+            session.status = "failed"
+            session.completed_at = datetime.utcnow()
+
+        # Re-fetch character to avoid detached instance issues
+        character = db.query(Character).filter(Character.id == character.id).first()
+        if character:
+            character.status = "failed"
+
         db.commit()
-    
+
     finally:
         db.close()
+        logger.info(f"[{request_id}] Training background task completed")
 
 @router.get("/characters/{character_id}/training", response_model=List[TrainingResponse])
 async def get_training_sessions(

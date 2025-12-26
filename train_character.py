@@ -390,6 +390,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # CRITICAL: Clear sys.argv after parsing to prevent ComfyUI's argparse from seeing our args.
+    # ComfyUI's main.py calls parse_args() on import, which calls sys.exit(2) on unrecognized args.
+    # By clearing argv now, ComfyUI's argparse will see no args and won't exit.
+    sys.argv = [sys.argv[0]]
+
     if not os.path.exists(args.input):
         print(f"Error: Input image '{args.input}' does not exist.")
         sys.exit(1)
