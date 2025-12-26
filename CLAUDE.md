@@ -816,3 +816,22 @@ The GUI stores API keys in the database, configurable via Settings page.
 5. **charforge-gui/frontend/src/views/TrainingView.vue**
    - Fixed `loadTrainingSessions()` which was hardcoded to return empty array
    - Now properly fetches sessions from API for all characters
+
+### Changes Made in Fix Session (2025-12-26)
+
+**Issue:** GUI training worked from CLI but failed immediately when launched from GUI
+
+**Root Cause:** ComfyUI's `main.py` calls `argparse.parse_args()` at import time. When `train_character.py` was run with arguments like `--name`, `--steps`, etc., ComfyUI's argparse saw these "unrecognized arguments" and called `sys.exit(2)`.
+
+1. **train_character.py** (CRITICAL FIX)
+   - Added `sys.argv = [sys.argv[0]]` after parsing our arguments
+   - This clears CLI args before ComfyUI imports, preventing the argparse conflict
+   - The fix is at line 396, right after `args = parser.parse_args()`
+
+2. **charforge-gui/backend/app/api/training.py**
+   - Added request_id correlation (8-char UUID prefix for all log messages)
+   - Added log file creation in work directory: `training_{request_id}.log`
+   - Added full traceback logging on exceptions
+   - Improved error messages with output capture
+
+**Verification:** Training sessions now transition from `pending` → `running` instead of failing immediately. See `reports/gui_training_fix_report.md` for full details.
