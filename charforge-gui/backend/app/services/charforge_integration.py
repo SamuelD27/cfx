@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Callable
 from dataclasses import dataclass
 import shutil
+from dotenv import dotenv_values
 
 from app.core.config import settings
 
@@ -114,13 +115,22 @@ class CharForgeIntegration:
         # Always set APP_PATH (required)
         env['APP_PATH'] = str(self.charforge_root)
 
-        # Only set non-empty environment variables
-        # This allows load_dotenv() in subprocess to load from .env file
-        # when keys are not configured in GUI settings
+        # Load .env file from CharForge root as fallback source
+        # This ensures training works even when GUI settings aren't configured
+        dotenv_path = self.charforge_root / ".env"
+        dotenv_vars = dotenv_values(dotenv_path) if dotenv_path.exists() else {}
+
+        # Set environment variables with priority: GUI settings > .env file > existing env
         for key in ['HF_HOME', 'HF_TOKEN', 'CIVITAI_API_KEY', 'GOOGLE_API_KEY', 'FAL_KEY']:
+            # Priority 1: GUI settings (from database)
             value = env_vars.get(key, '')
-            if value:  # Only set if non-empty
+            if value:
                 env[key] = value
+            # Priority 2: .env file from CharForge root
+            elif key in dotenv_vars and dotenv_vars[key]:
+                env[key] = dotenv_vars[key]
+            # Priority 3: Already in environment (from Docker, etc.)
+            # (already in env from os.environ.copy())
 
         return env
 
