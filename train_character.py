@@ -1,21 +1,43 @@
 #!/usr/bin/env python3
+"""
+Train a character LoRA model.
+
+IMPORTANT: This script uses lazy imports for ComfyUI-dependent modules.
+ComfyUI's main.py calls parse_args() on import, which would hijack our argparse.
+By deferring imports until after our argparse runs, we avoid this conflict.
+"""
 
 import argparse
 import gc
 import os
 import sys
+import time
 import torch
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from dotenv import load_dotenv
 
-from helpers import run_subprocess
-from training.generate_sheet import timing
-
-# Load .env from the script's directory
+# Load .env from the script's directory BEFORE other imports
 load_dotenv(Path(__file__).parent / ".env")
 
-from training.generate_sheet import generate_char_sheet
+# NOTE: We use lazy imports for these modules because they trigger ComfyUI's argparse:
+# - training.generate_sheet (imports ComfyUI nodes)
+# - helpers.run_subprocess is safe to import early
+from helpers import run_subprocess
+
+
+@contextmanager
+def timing(component_name, log_file):
+    """Local timing context manager to avoid importing from training.generate_sheet early."""
+    start_time = time.time()
+    try:
+        yield
+    finally:
+        elapsed_time = time.time() - start_time
+        if log_file:
+            with open(log_file, 'a') as f:
+                f.write(f"{component_name}: {elapsed_time:.2f} seconds\n")
 
 
 @dataclass
@@ -76,15 +98,18 @@ def build_charsheet(config: CharacterConfig):
     Process a character through the complete workflow:
     1. Generate character sheet
     2. Caption the generated images
-    
+
     Args:
         name (str): Character name
         input_image (str): Path to input image
         work_dir (str, optional): Working directory path. If None, uses ./scratch/{name}/
-    
+
     Returns:
         str: Path to directory containing all generated images and captions
     """
+    # LAZY IMPORT: Import here to avoid ComfyUI argparse hijacking at module load
+    from training.generate_sheet import generate_char_sheet
+
     # Step 1: Generate character sheet
     print(f"Step 1: Generating character sheet for '{config.name}'")
     if config.work_dir is None:
