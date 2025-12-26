@@ -116,8 +116,8 @@ def import_custom_nodes() -> None:
     server_instance = server.PromptServer(loop)
     execution.PromptQueue(server_instance)
 
-    # Initializing custom nodes
-    init_extra_nodes()
+    # Initializing custom nodes (init_extra_nodes is async, so we need to run it properly)
+    loop.run_until_complete(init_extra_nodes())
 
 
 from nodes import (
